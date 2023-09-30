@@ -81,16 +81,58 @@ uint32_t ToPosixProtectFlags(PageAccess access) {
 
 bool IsWritableExecutableMemorySupported() { return true; }
 
+struct _AllocationData {
+  size_t baseAddress;
+  size_t boundary;
+};
+
+std::vector<struct _AllocationData> allocations_;
+
 void* AllocFixed(void* base_address, size_t length,
                  AllocationType allocation_type, PageAccess access) {
   // mmap does not support reserve / commit, so ignore allocation_type.
   uint32_t prot = ToPosixProtectFlags(access);
+
+
+  //Check to see if this memory is already mapped to our memory file. If not, then allocate from ram.
+  //TODO: Do not assume that the virtual_membase_ succeeded on the first, try, these values could be false but would be true 99% of the time.
+  size_t virtual_membase_ = (1ull << 32);
+  size_t physical_membase_limit_ = (2ull << 32)  + (size_t)0x11FFFFFFF;
+
+
+
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
   if (base_address != nullptr) {
-    flags |= MAP_FIXED;
+    flags |= MAP_FIXED_NOREPLACE;
   }
   void* result = mmap(base_address, length, prot, flags, -1, 0);
   if (result == MAP_FAILED) {
+    if (virtual_membase_ <= (size_t)base_address <= physical_membase_limit_
+        &&
+        virtual_membase_ <= ((size_t)base_address + length) <= physical_membase_limit_
+        && base_address != nullptr) {
+          //Only keep track of commits.
+          bool shouldAlloc = (((uint8_t)allocation_type & 2) == 2);
+          for (const auto& allocation : allocations_) {
+            size_t upperAllocationBound = (size_t) base_address + length;
+            if ((upperAllocationBound < allocation.baseAddress)
+                ||
+                (allocation.boundary < (size_t) base_address)) {
+              continue;
+            } else {
+              shouldAlloc = false;
+            }
+          }
+
+          if(shouldAlloc){
+            if (Protect(base_address, length, access)) {
+              return base_address;
+            }
+          }else if ((((uint8_t)allocation_type & 1) == 1)) {
+            return base_address;
+          }
+    }
+
     return nullptr;
   } else {
     return result;
@@ -99,7 +141,33 @@ void* AllocFixed(void* base_address, size_t length,
 
 bool DeallocFixed(void* base_address, size_t length,
                   DeallocationType deallocation_type) {
-  return munmap(base_address, length) == 0;
+
+  size_t virtual_membase_ = (1ull << 32);
+  size_t physical_membase_limit_ = (2ull << 32)  + (size_t)0x11FFFFFFF;
+  if (virtual_membase_ <= (size_t)base_address <= physical_membase_limit_
+      &&
+      virtual_membase_ <= ((size_t)base_address + length) <= physical_membase_limit_) {
+          for (size_t i = 0; i <  allocations_.size(); i++) {
+            
+            size_t upperAllocationBound = (size_t) base_address + length;
+            if ((upperAllocationBound < allocations_.at(i).baseAddress)
+                ||
+                (allocations_.at(i).boundary < (size_t) base_address)) {
+              continue;
+            } else {
+              if (!(allocations_.at(i).baseAddress == (size_t)base_address && allocations_.at(i).boundary == upperAllocationBound)) {
+                assert_always("Error: Unexpected allocation!");
+              }
+              allocations_.erase(allocations_.begin() + i);
+              return Protect(base_address, length, PageAccess::kNoAccess);
+            }
+          }
+
+          return false;
+    
+  } else {
+    return munmap(base_address, length) == 0;
+  }
 }
 
 bool Protect(void* base_address, size_t length, PageAccess access,
@@ -181,8 +249,20 @@ void CloseFileMappingHandle(FileMappingHandle handle,
 void* MapFileView(FileMappingHandle handle, void* base_address, size_t length,
                   PageAccess access, size_t file_offset) {
   uint32_t prot = ToPosixProtectFlags(access);
-  return mmap64(base_address, length, prot, MAP_PRIVATE | MAP_ANONYMOUS, handle,
+
+  int flags = MAP_SHARED;
+  if (base_address != nullptr) {
+    flags = flags | MAP_FIXED_NOREPLACE;
+  }
+
+  void* result = mmap(base_address, length, prot, flags, handle,
                 file_offset);
+
+  if (result == MAP_FAILED) {
+    return nullptr;
+  }else {
+    return result;
+  }
 }
 
 bool UnmapFileView(FileMappingHandle handle, void* base_address,
