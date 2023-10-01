@@ -81,58 +81,44 @@ uint32_t ToPosixProtectFlags(PageAccess access) {
 
 bool IsWritableExecutableMemorySupported() { return true; }
 
-struct _AllocationData {
-  size_t baseAddress;
-  size_t boundary;
+struct MappedFileRange {
+  size_t region_begin;
+  size_t region_end;
 };
 
-std::vector<struct _AllocationData> allocations_;
+std::vector<struct MappedFileRange> mapped_file_ranges;
 
 void* AllocFixed(void* base_address, size_t length,
                  AllocationType allocation_type, PageAccess access) {
   // mmap does not support reserve / commit, so ignore allocation_type.
   uint32_t prot = ToPosixProtectFlags(access);
 
-
-  //Check to see if this memory is already mapped to our memory file. If not, then allocate from ram.
-  //TODO: Do not assume that the virtual_membase_ succeeded on the first, try, these values could be false but would be true 99% of the time.
-  size_t virtual_membase_ = (1ull << 32);
-  size_t physical_membase_limit_ = (2ull << 32)  + (size_t)0x11FFFFFFF;
-
-
-
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
   if (base_address != nullptr) {
     flags |= MAP_FIXED_NOREPLACE;
   }
   void* result = mmap(base_address, length, prot, flags, -1, 0);
-  if (result == MAP_FAILED) {
-    if (virtual_membase_ <= (size_t)base_address <= physical_membase_limit_
-        &&
-        virtual_membase_ <= ((size_t)base_address + length) <= physical_membase_limit_
-        && base_address != nullptr) {
-          //Only keep track of commits.
-          bool shouldAlloc = (((uint8_t)allocation_type & 2) == 2);
-          for (const auto& allocation : allocations_) {
-            size_t upperAllocationBound = (size_t) base_address + length;
-            if ((upperAllocationBound < allocation.baseAddress)
-                ||
-                (allocation.boundary < (size_t) base_address)) {
-              continue;
-            } else {
-              shouldAlloc = false;
-            }
-          }
 
-          if(shouldAlloc){
-            if (Protect(base_address, length, access)) {
-              return base_address;
-            }
-          }else if ((((uint8_t)allocation_type & 1) == 1)) {
+  if (result == MAP_FAILED) {
+    // If the address is within this range, the mmap failed because we have
+    // already mapped this memory.
+    size_t region_begin = (size_t)base_address;
+    size_t region_end = (size_t)base_address + length;
+    for (const auto mapped_range : mapped_file_ranges) {
+      // Check if the allocation is within this range...
+      if (region_begin >= mapped_range.region_begin &&
+          region_end <= mapped_range.region_end) {
+        bool should_protect = (((uint8_t)allocation_type & 2) == 2);
+
+        if (should_protect) {
+          if (Protect(base_address, length, access)) {
             return base_address;
           }
+        } else if ((((uint8_t)allocation_type & 1) == 1)) {
+          return base_address;
+        }
+      }
     }
-
     return nullptr;
   } else {
     return result;
@@ -141,33 +127,16 @@ void* AllocFixed(void* base_address, size_t length,
 
 bool DeallocFixed(void* base_address, size_t length,
                   DeallocationType deallocation_type) {
-
-  size_t virtual_membase_ = (1ull << 32);
-  size_t physical_membase_limit_ = (2ull << 32)  + (size_t)0x11FFFFFFF;
-  if (virtual_membase_ <= (size_t)base_address <= physical_membase_limit_
-      &&
-      virtual_membase_ <= ((size_t)base_address + length) <= physical_membase_limit_) {
-          for (size_t i = 0; i <  allocations_.size(); i++) {
-            
-            size_t upperAllocationBound = (size_t) base_address + length;
-            if ((upperAllocationBound < allocations_.at(i).baseAddress)
-                ||
-                (allocations_.at(i).boundary < (size_t) base_address)) {
-              continue;
-            } else {
-              if (!(allocations_.at(i).baseAddress == (size_t)base_address && allocations_.at(i).boundary == upperAllocationBound)) {
-                assert_always("Error: Unexpected allocation!");
-              }
-              allocations_.erase(allocations_.begin() + i);
-              return Protect(base_address, length, PageAccess::kNoAccess);
-            }
-          }
-
-          return false;
-    
-  } else {
-    return munmap(base_address, length) == 0;
+  size_t region_begin = (size_t)base_address;
+  size_t region_end = (size_t)base_address + length;
+  for (const auto mapped_range : mapped_file_ranges) {
+    if (region_begin >= mapped_range.region_begin &&
+        region_end <= mapped_range.region_end) {
+      return Protect(base_address, length, PageAccess::kNoAccess);
+    }
   }
+
+  return munmap(base_address, length) == 0;
 }
 
 bool Protect(void* base_address, size_t length, PageAccess access,
@@ -261,12 +230,25 @@ void* MapFileView(FileMappingHandle handle, void* base_address, size_t length,
   if (result == MAP_FAILED) {
     return nullptr;
   }else {
+    mapped_file_ranges.push_back({(size_t)result, (size_t)result + length});
     return result;
   }
 }
 
 bool UnmapFileView(FileMappingHandle handle, void* base_address,
                    size_t length) {
+  for (auto mapped_range = mapped_file_ranges.begin();
+       mapped_range != mapped_file_ranges.end();) {
+    if (mapped_range->region_begin == (size_t)base_address &&
+        mapped_range->region_end == (size_t)base_address + length) {
+      mapped_file_ranges.erase(mapped_range);
+      return munmap(base_address, length) == 0;
+    } else {
+      mapped_range++;
+    }
+  }
+  // TODO: Implement partial file unmapping.
+  assert_always("Error: Partial unmapping of files not yet supported.");
   return munmap(base_address, length) == 0;
 }
 
