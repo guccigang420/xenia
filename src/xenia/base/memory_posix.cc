@@ -95,31 +95,39 @@ void* AllocFixed(void* base_address, size_t length,
                  AllocationType allocation_type, PageAccess access) {
   // mmap does not support reserve / commit, so ignore allocation_type.
   uint32_t prot = ToPosixProtectFlags(access);
+  int flags = MAP_PRIVATE | MAP_ANONYMOUS;
 
-  const size_t region_begin = (size_t)base_address;
-  const size_t region_end = (size_t)base_address + length;
-
-  std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
-  for (const auto& mapped_range : mapped_file_ranges) {
-    // Check if the allocation is within this range...
-    if (region_begin >= mapped_range.region_begin &&
-        region_end <= mapped_range.region_end) {
-      bool should_protect = (((uint8_t)allocation_type & 2) == 2);
-
-      if (should_protect) {
-        if (Protect(base_address, length, access)) {
-          return base_address;
-        }
-      } else if ((((uint8_t)allocation_type & 1) == 1)) {
+  if (base_address != nullptr) {
+    bool should_protect = allocation_type == AllocationType::kCommit;
+    if (should_protect) {
+      if (Protect(base_address, length, access)){
         return base_address;
+      } else {
+        return nullptr;
       }
     }
-  }
 
-  int flags = MAP_PRIVATE | MAP_ANONYMOUS;
-  if (base_address != nullptr) {
+    const size_t region_begin = (size_t)base_address;
+    const size_t region_end = (size_t)base_address + length;
+    
+    std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
+    for (const auto& mapped_range : mapped_file_ranges) {
+      // Check if the allocation is within this range...
+      if (region_begin >= mapped_range.region_begin &&
+          region_end <= mapped_range.region_end) {
+        if (allocation_type == AllocationType::kReserveCommit) {
+          if (Protect(base_address, length, access)) {
+            return base_address;
+          }
+        } else {
+          return base_address;
+        }
+      }
+    }
+
     flags |= MAP_FIXED_NOREPLACE;
   }
+
   void* result = mmap(base_address, length, prot, flags, -1, 0);
 
   if (result == MAP_FAILED) {
