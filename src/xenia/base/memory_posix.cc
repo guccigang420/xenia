@@ -10,9 +10,11 @@
 #include "xenia/base/memory.h"
 
 #include <fcntl.h>
+#include <semaphore.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cstddef>
+#include <mutex>
 
 #include "xenia/base/math.h"
 #include "xenia/base/platform.h"
@@ -87,11 +89,32 @@ struct MappedFileRange {
 };
 
 std::vector<struct MappedFileRange> mapped_file_ranges;
+std::mutex g_mapped_file_ranges_mutex;
 
 void* AllocFixed(void* base_address, size_t length,
                  AllocationType allocation_type, PageAccess access) {
   // mmap does not support reserve / commit, so ignore allocation_type.
   uint32_t prot = ToPosixProtectFlags(access);
+
+  const size_t region_begin = (size_t)base_address;
+  const size_t region_end = (size_t)base_address + length;
+
+  std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
+  for (const auto& mapped_range : mapped_file_ranges) {
+    // Check if the allocation is within this range...
+    if (region_begin >= mapped_range.region_begin &&
+        region_end <= mapped_range.region_end) {
+      bool should_protect = (((uint8_t)allocation_type & 2) == 2);
+
+      if (should_protect) {
+        if (Protect(base_address, length, access)) {
+          return base_address;
+        }
+      } else if ((((uint8_t)allocation_type & 1) == 1)) {
+        return base_address;
+      }
+    }
+  }
 
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
   if (base_address != nullptr) {
@@ -100,25 +123,6 @@ void* AllocFixed(void* base_address, size_t length,
   void* result = mmap(base_address, length, prot, flags, -1, 0);
 
   if (result == MAP_FAILED) {
-    // If the address is within this range, the mmap failed because we have
-    // already mapped this memory.
-    size_t region_begin = (size_t)base_address;
-    size_t region_end = (size_t)base_address + length;
-    for (const auto mapped_range : mapped_file_ranges) {
-      // Check if the allocation is within this range...
-      if (region_begin >= mapped_range.region_begin &&
-          region_end <= mapped_range.region_end) {
-        bool should_protect = (((uint8_t)allocation_type & 2) == 2);
-
-        if (should_protect) {
-          if (Protect(base_address, length, access)) {
-            return base_address;
-          }
-        } else if ((((uint8_t)allocation_type & 1) == 1)) {
-          return base_address;
-        }
-      }
-    }
     return nullptr;
   } else {
     return result;
@@ -127,9 +131,11 @@ void* AllocFixed(void* base_address, size_t length,
 
 bool DeallocFixed(void* base_address, size_t length,
                   DeallocationType deallocation_type) {
-  size_t region_begin = (size_t)base_address;
-  size_t region_end = (size_t)base_address + length;
-  for (const auto mapped_range : mapped_file_ranges) {
+  const size_t region_begin = (size_t)base_address;
+  const size_t region_end = (size_t)base_address + length;
+
+  std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
+  for (const auto& mapped_range : mapped_file_ranges) {
     if (region_begin >= mapped_range.region_begin &&
         region_end <= mapped_range.region_end) {
       return Protect(base_address, length, PageAccess::kNoAccess);
@@ -221,7 +227,7 @@ void* MapFileView(FileMappingHandle handle, void* base_address, size_t length,
 
   int flags = MAP_SHARED;
   if (base_address != nullptr) {
-    flags = flags | MAP_FIXED_NOREPLACE;
+    flags |= MAP_FIXED_NOREPLACE;
   }
 
   void* result = mmap(base_address, length, prot, flags, handle,
@@ -229,7 +235,8 @@ void* MapFileView(FileMappingHandle handle, void* base_address, size_t length,
 
   if (result == MAP_FAILED) {
     return nullptr;
-  }else {
+  } else {
+    std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
     mapped_file_ranges.push_back({(size_t)result, (size_t)result + length});
     return result;
   }
@@ -237,6 +244,7 @@ void* MapFileView(FileMappingHandle handle, void* base_address, size_t length,
 
 bool UnmapFileView(FileMappingHandle handle, void* base_address,
                    size_t length) {
+  std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
   for (auto mapped_range = mapped_file_ranges.begin();
        mapped_range != mapped_file_ranges.end();) {
     if (mapped_range->region_begin == (size_t)base_address &&
