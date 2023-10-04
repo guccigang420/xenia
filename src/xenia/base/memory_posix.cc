@@ -109,7 +109,7 @@ void* AllocFixed(void* base_address, size_t length,
 
     const size_t region_begin = (size_t)base_address;
     const size_t region_end = (size_t)base_address + length;
-    
+
     std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
     for (const auto& mapped_range : mapped_file_ranges) {
       // Check if the allocation is within this range...
@@ -118,6 +118,8 @@ void* AllocFixed(void* base_address, size_t length,
         if (allocation_type == AllocationType::kReserveCommit) {
           if (Protect(base_address, length, access)) {
             return base_address;
+          } else {
+            assert_always("Error: Could not change protection of mapped range!");
           }
         } else {
           return base_address;
