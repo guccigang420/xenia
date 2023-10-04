@@ -106,27 +106,6 @@ void* AllocFixed(void* base_address, size_t length,
         return nullptr;
       }
     }
-
-    const size_t region_begin = (size_t)base_address;
-    const size_t region_end = (size_t)base_address + length;
-
-    std::lock_guard<std::mutex> guard(g_mapped_file_ranges_mutex);
-    for (const auto& mapped_range : mapped_file_ranges) {
-      // Check if the allocation is within this range...
-      if (region_begin >= mapped_range.region_begin &&
-          region_end <= mapped_range.region_end) {
-        if (allocation_type == AllocationType::kReserveCommit) {
-          if (Protect(base_address, length, access)) {
-            return base_address;
-          } else {
-            assert_always("Error: Could not change protection of mapped range!");
-          }
-        } else {
-          return base_address;
-        }
-      }
-    }
-
     flags |= MAP_FIXED_NOREPLACE;
   }
 
@@ -148,11 +127,27 @@ bool DeallocFixed(void* base_address, size_t length,
   for (const auto& mapped_range : mapped_file_ranges) {
     if (region_begin >= mapped_range.region_begin &&
         region_end <= mapped_range.region_end) {
-      return Protect(base_address, length, PageAccess::kNoAccess);
+          
+      switch(deallocation_type) {
+        case DeallocationType::kDecommit:
+          return Protect(base_address, length, PageAccess::kNoAccess);
+        case DeallocationType::kRelease:
+          assert_always("Error: Tried to release mapped memory!");
+        default:
+          assert_unhandled_case(deallocation_type);
+      }
+      
     }
   }
 
-  return munmap(base_address, length) == 0;
+  switch(deallocation_type) {
+    case DeallocationType::kDecommit:
+      return Protect(base_address, length, PageAccess::kNoAccess);
+    case DeallocationType::kRelease:
+      return munmap(base_address, length) == 0;
+    default:
+      assert_unhandled_case(deallocation_type);
+  }
 }
 
 bool Protect(void* base_address, size_t length, PageAccess access,
