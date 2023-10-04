@@ -28,7 +28,7 @@ namespace xe {
 namespace hid {
 namespace linuxkey {
 
-void WinKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
+void LinuxKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
                                         const std::string_view description,
                                         const std::string_view source_tokens) {
   for (const std::string_view source_token :
@@ -38,13 +38,16 @@ void WinKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
 
     std::string_view token = source_token;
 
-    if (utf8::starts_with(token, "_")) {
-      key_binding.lowercase = true;
-      token = token.substr(1);
-    } else if (utf8::starts_with(token, "^")) {
-      key_binding.uppercase = true;
-      token = token.substr(1);
-    }
+    // Upper and lowercase not yet supported!
+
+    // if (utf8::starts_with(token, "_")) {
+    //   key_binding.lowercase = true;
+    //   token = token.substr(1);
+    // } else if (utf8::starts_with(token, "^")) {
+    //   key_binding.uppercase = true;
+    //   token = token.substr(1);
+    // }
+    token = token.substr(1);
 
     if (utf8::starts_with(token, "0x")) {
       token = token.substr(2);
@@ -67,7 +70,7 @@ void WinKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
   }
 }
 
-WinKeyInputDriver::WinKeyInputDriver(xe::ui::Window* window,
+LinuxKeyInputDriver::LinuxKeyInputDriver(xe::ui::Window* window,
                                      size_t window_z_order)
     : InputDriver(window, window_z_order), window_input_listener_(*this) {
 #define XE_HID_WINKEY_BINDING(button, description, cvar_name,          \
@@ -80,13 +83,13 @@ WinKeyInputDriver::WinKeyInputDriver(xe::ui::Window* window,
   window->AddInputListener(&window_input_listener_, window_z_order);
 }
 
-WinKeyInputDriver::~WinKeyInputDriver() {
+LinuxKeyInputDriver::~LinuxKeyInputDriver() {
   window()->RemoveInputListener(&window_input_listener_);
 }
 
-X_STATUS WinKeyInputDriver::Setup() { return X_STATUS_SUCCESS; }
+X_STATUS LinuxKeyInputDriver::Setup() { return X_STATUS_SUCCESS; }
 
-X_RESULT WinKeyInputDriver::GetCapabilities(uint32_t user_index, uint32_t flags,
+X_RESULT LinuxKeyInputDriver::GetCapabilities(uint32_t user_index, uint32_t flags,
                                             X_INPUT_CAPABILITIES* out_caps) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -108,7 +111,7 @@ X_RESULT WinKeyInputDriver::GetCapabilities(uint32_t user_index, uint32_t flags,
   return X_ERROR_SUCCESS;
 }
 
-X_RESULT WinKeyInputDriver::GetState(uint32_t user_index,
+X_RESULT LinuxKeyInputDriver::GetState(uint32_t user_index,
                                      X_INPUT_STATE* out_state) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -125,11 +128,8 @@ X_RESULT WinKeyInputDriver::GetState(uint32_t user_index,
   int16_t thumb_ry = 0;
 
   if (window()->HasFocus() && is_active()) {
-    bool capital = IsKeyToggled(VK_CAPITAL) || IsKeyDown(VK_SHIFT);
     for (const KeyBinding& b : key_bindings_) {
-      if (((b.lowercase == b.uppercase) || (b.lowercase && !capital) ||
-           (b.uppercase && capital)) &&
-          IsKeyDown(b.input_key)) {
+      if (b.is_pressed) {
         switch (b.output_key) {
           case ui::VirtualKey::kXInputPadA:
             buttons |= 0x1000;  // XINPUT_GAMEPAD_A
@@ -220,7 +220,7 @@ X_RESULT WinKeyInputDriver::GetState(uint32_t user_index,
   return X_ERROR_SUCCESS;
 }
 
-X_RESULT WinKeyInputDriver::SetState(uint32_t user_index,
+X_RESULT LinuxKeyInputDriver::SetState(uint32_t user_index,
                                      X_INPUT_VIBRATION* vibration) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -229,7 +229,7 @@ X_RESULT WinKeyInputDriver::SetState(uint32_t user_index,
   return X_ERROR_SUCCESS;
 }
 
-X_RESULT WinKeyInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
+X_RESULT LinuxKeyInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
                                          X_INPUT_KEYSTROKE* out_keystroke) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -258,11 +258,8 @@ X_RESULT WinKeyInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
     key_events_.pop();
   }
 
-  bool capital = IsKeyToggled(VK_CAPITAL) || IsKeyDown(VK_SHIFT);
   for (const KeyBinding& b : key_bindings_) {
-    if (b.input_key == evt.virtual_key &&
-        ((b.lowercase == b.uppercase) || (b.lowercase && !capital) ||
-         (b.uppercase && capital))) {
+    if (b.input_key == evt.virtual_key) {
       xinput_virtual_key = b.output_key;
     }
   }
@@ -314,6 +311,11 @@ void LinuxKeyInputDriver::OnKey(ui::KeyEvent& e, bool is_down) {
 
   auto global_lock = global_critical_region_.Acquire();
   key_events_.push(key);
+  for (auto& key_binding : key_bindings_) {
+    if (key_binding.input_key == key.virtual_key && is_down) {
+      key_binding.is_pressed = is_down;
+    }
+  }
 }
 
 }  // namespace winkey

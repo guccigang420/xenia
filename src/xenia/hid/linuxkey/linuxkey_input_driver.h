@@ -48,11 +48,16 @@ class LinuxKeyInputDriver final : public InputDriver {
     LinuxKeyInputDriver& driver_;
   };
 
+  struct KeyEvent {
+    ui::VirtualKey virtual_key = ui::VirtualKey::kNone;
+    int repeat_count = 0;
+    bool transition = false;  // going up(false) or going down(true)
+    bool prev_state = false;  // down(true) or up(false)
+  };
+
   struct KeyBinding {
     ui::VirtualKey input_key = ui::VirtualKey::kNone;
     ui::VirtualKey output_key = ui::VirtualKey::kNone;
-    bool uppercase = false;
-    bool lowercase = false;
     bool is_pressed = false;
   };
 
@@ -64,10 +69,12 @@ class LinuxKeyInputDriver final : public InputDriver {
 
   xe::global_critical_region global_critical_region_;
 
-  std::queue<ui::KeyEvent> key_events_;
+  std::queue<KeyEvent> key_events_;
   std::vector<KeyBinding> key_bindings_;
 
   LinuxKeyWindowInputListener window_input_listener_;
+
+  uint32_t packet_number_ = 1;
 
 };
 
