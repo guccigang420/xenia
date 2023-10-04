@@ -313,7 +313,7 @@ void LinuxKeyInputDriver::OnKey(ui::KeyEvent& e, bool is_down) {
   auto global_lock = global_critical_region_.Acquire();
   key_events_.push(key);
   for (auto& key_binding : key_bindings_) {
-    if (key_binding.input_key == key.virtual_key && is_down) {
+    if (key_binding.input_key == key.virtual_key) {
       key_binding.is_pressed = is_down;
     }
   }

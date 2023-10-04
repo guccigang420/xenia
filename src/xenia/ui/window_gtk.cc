@@ -476,6 +476,22 @@ VirtualKey GTKWindow::TranslateVirtualKey(guint keyval) {
       return VirtualKey::k8;
     case GDK_KEY_9:
       return VirtualKey::k9;
+    case GDK_KEY_semicolon:
+      return VirtualKey::kOem1;
+    case GDK_KEY_apostrophe:
+      return VirtualKey::kOem7;
+    case GDK_KEY_comma:
+      return VirtualKey::kOemComma;
+    case GDK_KEY_period:
+      return VirtualKey::kOemPeriod;
+    case GDK_KEY_uparrow:
+      return VirtualKey::kUp;
+    case GDK_KEY_downarrow:
+      return VirtualKey::kDown;
+    case GDK_KEY_leftarrow:
+      return VirtualKey::kLeft;
+    case GDK_KEY_rightarrow:
+      return VirtualKey::kRight;
     default:
       return VirtualKey(keyval);
   }
