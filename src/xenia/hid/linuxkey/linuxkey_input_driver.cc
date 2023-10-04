@@ -15,14 +15,14 @@
 #include "xenia/ui/virtual_key.h"
 #include "xenia/ui/window.h"
 
-#define XE_HID_WINKEY_BINDING(button, description, cvar_name, \
+#define XE_HID_LINUXKEY_BINDING(button, description, cvar_name, \
                               cvar_default_value)             \
   DEFINE_string(cvar_name, cvar_default_value,                \
                 "List of keys to bind to " description        \
                 ", separated by spaces",                      \
                 "HID.WinKey")
-#include "winkey_binding_table.inc"
-#undef XE_HID_WINKEY_BINDING
+#include "linuxkey_binding_table.inc"
+#undef XE_HID_LINUXKEY_BINDING
 
 namespace xe {
 namespace hid {
@@ -40,14 +40,13 @@ void LinuxKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
 
     // Upper and lowercase not yet supported!
 
-    // if (utf8::starts_with(token, "_")) {
-    //   key_binding.lowercase = true;
-    //   token = token.substr(1);
-    // } else if (utf8::starts_with(token, "^")) {
-    //   key_binding.uppercase = true;
-    //   token = token.substr(1);
-    // }
-    token = token.substr(1);
+    if (utf8::starts_with(token, "_")) {
+      key_binding.lowercase = true;
+      token = token.substr(1);
+    } else if (utf8::starts_with(token, "^")) {
+      key_binding.uppercase = true;
+      token = token.substr(1);
+    }
 
     if (utf8::starts_with(token, "0x")) {
       token = token.substr(2);
@@ -73,12 +72,12 @@ void LinuxKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
 LinuxKeyInputDriver::LinuxKeyInputDriver(xe::ui::Window* window,
                                      size_t window_z_order)
     : InputDriver(window, window_z_order), window_input_listener_(*this) {
-#define XE_HID_WINKEY_BINDING(button, description, cvar_name,          \
+#define XE_HID_LINUXKEY_BINDING(button, description, cvar_name,          \
                               cvar_default_value)                      \
   ParseKeyBinding(xe::ui::VirtualKey::kXInputPad##button, description, \
                   cvars::cvar_name);
-#include "winkey_binding_table.inc"
-#undef XE_HID_WINKEY_BINDING
+#include "linuxkey_binding_table.inc"
+#undef XE_HID_LINUXKEY_BINDING
 
   window->AddInputListener(&window_input_listener_, window_z_order);
 }
@@ -203,6 +202,8 @@ X_RESULT LinuxKeyInputDriver::GetState(uint32_t user_index,
           case ui::VirtualKey::kXInputPadRThumbLeft:
             thumb_rx += SHRT_MIN;
             break;
+          default:
+            assert_unhandled_case(b.output_key);
         }
       }
     }

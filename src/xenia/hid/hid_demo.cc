@@ -40,6 +40,9 @@
 #if !XE_PLATFORM_ANDROID
 #include "xenia/hid/sdl/sdl_hid.h"
 #endif  // !XE_PLATFORM_ANDROID
+#if XE_PLATFORM_LINUX && !XE_PLATFORM_ANDROID
+#include "xenia/hid/linuxkey/linuxkey_hid.h"
+#endif
 #if XE_PLATFORM_WIN32
 #include "xenia/hid/winkey/winkey_hid.h"
 #include "xenia/hid/xinput/xinput_hid.h"
@@ -151,6 +154,12 @@ std::vector<std::unique_ptr<hid::InputDriver>> HidDemoApp::CreateInputDrivers(
       drivers.emplace_back(std::move(sdl_driver));
     }
 #endif  // !XE_PLATFORM_ANDROID
+#if XE_PLATFORM_LINUX && !XE_PLATFORM_ANDROID
+    auto linuxkey_driver = xe::hid::linuxkey::Create(window, kZOrderHidInput);
+    if (linuxkey_driver && XSUCCEEDED(linuxkey_driver->Setup())) {
+      drivers.emplace_back(std::move(linuxkey_driver));
+    }
+#endif
 #if XE_PLATFORM_WIN32
     auto xinput_driver = xe::hid::xinput::Create(window, kZOrderHidInput);
     if (xinput_driver && XSUCCEEDED(xinput_driver->Setup())) {

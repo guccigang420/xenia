@@ -7,8 +7,8 @@
  ******************************************************************************
  */
 
-#ifndef XENIA_HID_WINKEY_WINKEY_INPUT_DRIVER_H_
-#define XENIA_HID_WINKEY_WINKEY_INPUT_DRIVER_H_
+#ifndef XENIA_HID_LINUXKEY_LINUXKEY_INPUT_DRIVER_H_
+#define XENIA_HID_LINUXKEY_LINUXKEY_INPUT_DRIVER_H_
 
 #include <queue>
 
@@ -58,6 +58,8 @@ class LinuxKeyInputDriver final : public InputDriver {
   struct KeyBinding {
     ui::VirtualKey input_key = ui::VirtualKey::kNone;
     ui::VirtualKey output_key = ui::VirtualKey::kNone;
+    bool uppercase = false;
+    bool lowercase = false;
     bool is_pressed = false;
   };
 

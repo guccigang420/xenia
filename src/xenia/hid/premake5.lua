@@ -47,6 +47,7 @@ project("xenia-hid-demo")
 
   filter("platforms:Linux")
     links({
+      "xenia-hid-linuxkey",
       "SDL2",
       "X11",
       "xcb",

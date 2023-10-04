@@ -13,7 +13,7 @@
 
 namespace xe {
 namespace hid {
-namespace winkey {
+namespace linuxkey {
 
 std::unique_ptr<InputDriver> Create(xe::ui::Window* window,
                                     size_t window_z_order) {
