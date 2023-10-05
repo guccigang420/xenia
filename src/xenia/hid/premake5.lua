@@ -45,9 +45,13 @@ project("xenia-hid-demo")
       "xenia-hid-sdl",
     })
 
+  filter("platforms:not Windows")
+    links({
+      "xenia-hid-keyboard"
+    })
+  
   filter("platforms:Linux")
     links({
-      "xenia-hid-linuxkey",
       "SDL2",
       "X11",
       "xcb",

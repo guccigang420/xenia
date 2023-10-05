@@ -7,7 +7,7 @@
  ******************************************************************************
  */
 
-#include "xenia/hid/linuxkey/linuxkey_input_driver.h"
+#include "xenia/hid/keyboard/keyboard_input_driver.h"
 
 #include "xenia/base/logging.h"
 #include "xenia/hid/hid_flags.h"
@@ -15,20 +15,20 @@
 #include "xenia/ui/virtual_key.h"
 #include "xenia/ui/window.h"
 
-#define XE_HID_LINUXKEY_BINDING(button, description, cvar_name, \
+#define XE_HID_KEYBOARD_BINDING(button, description, cvar_name, \
                               cvar_default_value)             \
   DEFINE_string(cvar_name, cvar_default_value,                \
                 "List of keys to bind to " description        \
                 ", separated by spaces",                      \
                 "HID.WinKey")
-#include "linuxkey_binding_table.inc"
-#undef XE_HID_LINUXKEY_BINDING
+#include "keyboard_binding_table.inc"
+#undef XE_HID_KEYBOARD_BINDING
 
 namespace xe {
 namespace hid {
-namespace linuxkey {
+namespace keyboard {
 
-void LinuxKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
+void KeyboardInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
                                         const std::string_view description,
                                         const std::string_view source_tokens) {
   for (const std::string_view source_token :
@@ -38,10 +38,8 @@ void LinuxKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
 
     std::string_view token = source_token;
 
-    // Upper and lowercase not yet supported!
-
     if (utf8::starts_with(token, "_")) {
-      key_binding.lowercase = true;
+      key_binding.uppercase = false;
       token = token.substr(1);
     } else if (utf8::starts_with(token, "^")) {
       key_binding.uppercase = true;
@@ -69,26 +67,26 @@ void LinuxKeyInputDriver::ParseKeyBinding(ui::VirtualKey output_key,
   }
 }
 
-LinuxKeyInputDriver::LinuxKeyInputDriver(xe::ui::Window* window,
+KeyboardInputDriver::KeyboardInputDriver(xe::ui::Window* window,
                                      size_t window_z_order)
     : InputDriver(window, window_z_order), window_input_listener_(*this) {
-#define XE_HID_LINUXKEY_BINDING(button, description, cvar_name,          \
+#define XE_HID_KEYBOARD_BINDING(button, description, cvar_name,          \
                               cvar_default_value)                      \
   ParseKeyBinding(xe::ui::VirtualKey::kXInputPad##button, description, \
                   cvars::cvar_name);
-#include "linuxkey_binding_table.inc"
-#undef XE_HID_LINUXKEY_BINDING
+#include "keyboard_binding_table.inc"
+#undef XE_HID_KEYBOARD_BINDING
 
   window->AddInputListener(&window_input_listener_, window_z_order);
 }
 
-LinuxKeyInputDriver::~LinuxKeyInputDriver() {
+KeyboardInputDriver::~KeyboardInputDriver() {
   window()->RemoveInputListener(&window_input_listener_);
 }
 
-X_STATUS LinuxKeyInputDriver::Setup() { return X_STATUS_SUCCESS; }
+X_STATUS KeyboardInputDriver::Setup() { return X_STATUS_SUCCESS; }
 
-X_RESULT LinuxKeyInputDriver::GetCapabilities(uint32_t user_index, uint32_t flags,
+X_RESULT KeyboardInputDriver::GetCapabilities(uint32_t user_index, uint32_t flags,
                                             X_INPUT_CAPABILITIES* out_caps) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -110,7 +108,7 @@ X_RESULT LinuxKeyInputDriver::GetCapabilities(uint32_t user_index, uint32_t flag
   return X_ERROR_SUCCESS;
 }
 
-X_RESULT LinuxKeyInputDriver::GetState(uint32_t user_index,
+X_RESULT KeyboardInputDriver::GetState(uint32_t user_index,
                                      X_INPUT_STATE* out_state) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -221,7 +219,7 @@ X_RESULT LinuxKeyInputDriver::GetState(uint32_t user_index,
   return X_ERROR_SUCCESS;
 }
 
-X_RESULT LinuxKeyInputDriver::SetState(uint32_t user_index,
+X_RESULT KeyboardInputDriver::SetState(uint32_t user_index,
                                      X_INPUT_VIBRATION* vibration) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -230,7 +228,7 @@ X_RESULT LinuxKeyInputDriver::SetState(uint32_t user_index,
   return X_ERROR_SUCCESS;
 }
 
-X_RESULT LinuxKeyInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
+X_RESULT KeyboardInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
                                          X_INPUT_KEYSTROKE* out_keystroke) {
   if (user_index != 0) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
@@ -291,15 +289,15 @@ X_RESULT LinuxKeyInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
   return result;
 }
 
-void LinuxKeyInputDriver::LinuxKeyWindowInputListener::OnKeyDown(ui::KeyEvent& e) {
+void KeyboardInputDriver::KeyboardWindowInputListener::OnKeyDown(ui::KeyEvent& e) {
   driver_.OnKey(e, true);
 }
 
-void LinuxKeyInputDriver::LinuxKeyWindowInputListener::OnKeyUp(ui::KeyEvent& e) {
+void KeyboardInputDriver::KeyboardWindowInputListener::OnKeyUp(ui::KeyEvent& e) {
   driver_.OnKey(e, false);
 }
 
-void LinuxKeyInputDriver::OnKey(ui::KeyEvent& e, bool is_down) {
+void KeyboardInputDriver::OnKey(ui::KeyEvent& e, bool is_down) {
   if (!is_active()) {
     return;
   }

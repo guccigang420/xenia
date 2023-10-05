@@ -7,8 +7,8 @@
  ******************************************************************************
  */
 
-#ifndef XENIA_HID_LINUXKEY_LINUXKEY_INPUT_DRIVER_H_
-#define XENIA_HID_LINUXKEY_LINUXKEY_INPUT_DRIVER_H_
+#ifndef XENIA_HID_KEYBOARD_KEYBOARD_INPUT_DRIVER_H_
+#define XENIA_HID_KEYBOARD_KEYBOARD_INPUT_DRIVER_H_
 
 #include <queue>
 
@@ -18,12 +18,12 @@
 
 namespace xe {
 namespace hid {
-namespace linuxkey {
+namespace keyboard {
 
-class LinuxKeyInputDriver final : public InputDriver {
+class KeyboardInputDriver final : public InputDriver {
  public:
-  explicit LinuxKeyInputDriver(xe::ui::Window* window, size_t window_z_order);
-  ~LinuxKeyInputDriver() override;
+  explicit KeyboardInputDriver(xe::ui::Window* window, size_t window_z_order);
+  ~KeyboardInputDriver() override;
 
   X_STATUS Setup() override;
 
@@ -36,16 +36,16 @@ class LinuxKeyInputDriver final : public InputDriver {
 
 
  protected:
-  class LinuxKeyWindowInputListener final : public ui::WindowInputListener {
+  class KeyboardWindowInputListener final : public ui::WindowInputListener {
    public:
-    explicit LinuxKeyWindowInputListener(LinuxKeyInputDriver& driver)
+    explicit KeyboardWindowInputListener(KeyboardInputDriver& driver)
         : driver_(driver) {}
 
     void OnKeyDown(ui::KeyEvent& e) override;
     void OnKeyUp(ui::KeyEvent& e) override;
 
    private:
-    LinuxKeyInputDriver& driver_;
+    KeyboardInputDriver& driver_;
   };
 
   struct KeyEvent {
@@ -60,7 +60,6 @@ class LinuxKeyInputDriver final : public InputDriver {
     ui::VirtualKey input_key = ui::VirtualKey::kNone;
     ui::VirtualKey output_key = ui::VirtualKey::kNone;
     bool uppercase = false;
-    bool lowercase = false;
     bool is_pressed = false;
   };
 
@@ -75,7 +74,7 @@ class LinuxKeyInputDriver final : public InputDriver {
   std::queue<KeyEvent> key_events_;
   std::vector<KeyBinding> key_bindings_;
 
-  LinuxKeyWindowInputListener window_input_listener_;
+  KeyboardWindowInputListener window_input_listener_;
 
   uint32_t packet_number_ = 1;
 

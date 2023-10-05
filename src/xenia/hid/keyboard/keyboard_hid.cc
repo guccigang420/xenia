@@ -7,22 +7,19 @@
  ******************************************************************************
  */
 
-#ifndef XENIA_HID_LINUXKEY_LINUXKEY_HID_H_
-#define XENIA_HID_LINUXKEY_LINUXKEY_HID_H_
+#include "xenia/hid/keyboard/keyboard_hid.h"
 
-#include <memory>
-
-#include "xenia/hid/input_system.h"
+#include "xenia/hid/keyboard/keyboard_input_driver.h"
 
 namespace xe {
 namespace hid {
-namespace linuxkey {
+namespace keyboard {
 
 std::unique_ptr<InputDriver> Create(xe::ui::Window* window,
-                                    size_t window_z_order);
+                                    size_t window_z_order) {
+  return std::make_unique<xe::hid::keyboard::KeyboardInputDriver>(window, window_z_order);
+}
 
 }  // namespace winkey
 }  // namespace hid
 }  // namespace xe
-
-#endif  // XENIA_HID_WINKEY_WINKEY_HID_H_
