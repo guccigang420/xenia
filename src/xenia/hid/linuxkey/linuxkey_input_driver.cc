@@ -260,7 +260,7 @@ X_RESULT LinuxKeyInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
   }
 
   for (const KeyBinding& b : key_bindings_) {
-    if (b.input_key == evt.virtual_key) {
+    if (b.input_key == evt.virtual_key && b.uppercase == evt.is_capital) {
       xinput_virtual_key = b.output_key;
     }
   }
@@ -309,12 +309,15 @@ void LinuxKeyInputDriver::OnKey(ui::KeyEvent& e, bool is_down) {
   key.transition = is_down;
   key.prev_state = e.prev_state();
   key.repeat_count = e.repeat_count();
+  key.is_capital = e.is_shift_pressed();
 
   auto global_lock = global_critical_region_.Acquire();
   key_events_.push(key);
   for (auto& key_binding : key_bindings_) {
     if (key_binding.input_key == key.virtual_key) {
-      key_binding.is_pressed = is_down;
+      if (key_binding.uppercase == e.is_shift_pressed()) {
+        key_binding.is_pressed = is_down;
+      }
     }
   }
 }

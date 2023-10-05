@@ -53,6 +53,7 @@ class LinuxKeyInputDriver final : public InputDriver {
     int repeat_count = 0;
     bool transition = false;  // going up(false) or going down(true)
     bool prev_state = false;  // down(true) or up(false)
+    bool is_capital = false;
   };
 
   struct KeyBinding {
