@@ -102,6 +102,7 @@ project("xenia-app")
       "xcb",
       "X11-xcb",
       "SDL2",
+      "xenia-hid-linuxkey",
     })
 
   filter("platforms:Windows")

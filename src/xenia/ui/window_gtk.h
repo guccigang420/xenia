@@ -59,6 +59,9 @@ class GTKWindow : public Window {
   void BeginBatchedSizeUpdate();
   void EndBatchedSizeUpdate(WindowDestructionReceiver& destruction_receiver);
 
+  //Utility to translate keycodes to VirtualKey
+  VirtualKey TranslateVirtualKey(guint keyval);
+
   // Handling events related to the whole window.
   bool HandleMouse(GdkEvent* event,
                    WindowDestructionReceiver& destruction_receiver);
