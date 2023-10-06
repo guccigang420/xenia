@@ -531,21 +531,21 @@ class PosixCondition<Thread> : public PosixConditionBase {
   }
 
   virtual ~PosixCondition() {
-    if (thread_ && !signaled_) {
-#if XE_PLATFORM_ANDROID
-      if (pthread_kill(thread_,
-                       GetSystemSignal(SignalType::kThreadTerminate)) != 0) {
-        assert_always();
-      }
-#else
-      if (pthread_cancel(thread_) != 0) {
-        assert_always();
-      }
-#endif
-      if (pthread_join(thread_, nullptr) != 0) {
-        assert_always();
-      }
-    }
+//     if (thread_ && !signaled_) {
+// #if XE_PLATFORM_ANDROID
+//       if (pthread_kill(thread_,
+//                        GetSystemSignal(SignalType::kThreadTerminate)) != 0) {
+//         assert_always();
+//       }
+// #else
+//       if (pthread_cancel(thread_) != 0) {
+//         assert_always();
+//       }
+// #endif
+//       if (pthread_join(thread_, nullptr) != 0) {
+//         assert_always();
+//       }
+//     }
   }
 
   bool Signal() override { return true; }
