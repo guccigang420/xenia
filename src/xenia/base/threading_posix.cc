@@ -1146,7 +1146,14 @@ Thread* Thread::GetCurrentThread() {
 }
 
 void Thread::Exit(int exit_code) {
-  pthread_exit(reinterpret_cast<void*>(exit_code));
+  if (current_thread_) {
+    current_thread_->Terminate(exit_code);
+  } else {
+    // Should only happen with the main thread
+    pthread_exit(reinterpret_cast<void*>(exit_code));
+  }
+  // Function must not return
+  assert_always();
 }
 
 void set_name(const std::string_view name) {
