@@ -484,13 +484,13 @@ VirtualKey GTKWindow::TranslateVirtualKey(guint keyval) {
       return VirtualKey::kOemComma;
     case GDK_KEY_period:
       return VirtualKey::kOemPeriod;
-    case GDK_KEY_uparrow:
+    case GDK_KEY_Up:
       return VirtualKey::kUp;
-    case GDK_KEY_downarrow:
+    case GDK_KEY_Down:
       return VirtualKey::kDown;
-    case GDK_KEY_leftarrow:
+    case GDK_KEY_Left:
       return VirtualKey::kLeft;
-    case GDK_KEY_rightarrow:
+    case GDK_KEY_Right:
       return VirtualKey::kRight;
     default:
       return VirtualKey(keyval);
